@@ -73,7 +73,10 @@ export async function apply(ctx: Context, config: Config) {
         return `已处理 ${await processRequests(ctx, config)} 条缓存请求`;
     });
 
-    ctx.command("验证器状态").action(async () => {
+    ctx.command("验证器状态").action(async ({ session }) => {
+        if (!session) {
+            throw new Error("无法获取会话信息");
+        }
         const friendRequests: SessionProcess[] = [];
         const guildRequests: SessionProcess[] = [];
         const guildMemberRequests: SessionProcess[] = [];
@@ -112,21 +115,34 @@ export async function apply(ctx: Context, config: Config) {
             return `${days}天${hours}小时${minutes}分钟`;
         };
 
-        const formatRequestList = (requests: SessionProcess[], type: "friend" | "guild" | "guild-member") => {
-            if (requests.length === 0) return "无";
+        const formatRequestList = async (requests: SessionProcess[], type: "friend" | "guild" | "guild-member") => {
+            if (requests.length === 0) return "  无";
+            const statusMap: Record<string, string> = {
+                pending: "待处理",
+                processing: "处理中",
+                processed: "已处理"
+            };
+            const user = await session.observeUser(["authority"]);
+            function maskId(origin?: string) {
+                if (!origin || origin.length < 3) return origin || "未知";
+                return `***${origin.slice(3)}`;
+            }
             return requests
                 .map((req, index) => {
                     const session = req.session;
                     const age = Date.now() - req.timestamp;
                     let id = "未知";
                     if (type === "friend" || type === "guild-member") {
-                        id = session.userId || "未知";
+                        id = user.authority >= 3 ? session.userId || "未知" : maskId(session.userId);
                     } else if (type === "guild") {
-                        id = session.guildId || "未知";
+                        id = user.authority >= 3 ? session.guildId || "未知" : maskId(session.guildId);
                     }
-                    return `  ${index + 1}. ${id} | 状态: ${req.status} | 时间: ${formatTimestamp(
-                        req.timestamp
-                    )} | 已等待: ${formatDuration(age)}`;
+                    const statusText = statusMap[req.status] || req.status;
+                    let line = `  ${index + 1}. ${id} | 状态: ${statusText} | 时间: ${formatTimestamp(req.timestamp)}`;
+                    if (req.status !== "processed") {
+                        line += ` | 已等待: ${formatDuration(age)}`;
+                    }
+                    return line;
                 })
                 .join("\n");
         };
@@ -134,19 +150,18 @@ export async function apply(ctx: Context, config: Config) {
         const output = [
             "=== 验证器状态 ===",
             "",
-            `【缓存】总请求: ${allKeys.length}`,
+            `总请求: ${allKeys.length}`,
             ...(config.onFriendRequest ? [`好友请求: ${friendRequests.length}`] : []),
             ...(config.onGuildRequest ? [`入群邀请: ${guildRequests.length}`] : []),
             ...(config.onGuildMemberRequest ? [`入群申请: ${guildMemberRequests.length}`] : []),
             ""
         ];
 
-        if (config.onFriendRequest) output.push("【好友请求】", formatRequestList(friendRequests, "friend"), "");
-        if (config.onGuildRequest) output.push("【入群邀请】", formatRequestList(guildRequests, "guild"), "");
+        if (config.onFriendRequest) output.push("【好友请求】", await formatRequestList(friendRequests, "friend"), "");
+        if (config.onGuildRequest) output.push("【入群邀请】", await formatRequestList(guildRequests, "guild"), "");
         if (config.onGuildMemberRequest)
-            output.push("【入群申请】", formatRequestList(guildMemberRequests, "guild-member"), "");
-
-        output.push(`更新时间: ${formatTimestamp(Date.now())}`);
+            output.push("【入群申请】", await formatRequestList(guildMemberRequests, "guild-member"), "");
+        while (output.length && output[output.length - 1] === "") output.pop();
         return output.join("\n");
     });
 }
