@@ -68,6 +68,78 @@ export async function apply(ctx: Context, config: Config) {
     ctx.on("guild-member-request", (session) => {
         handleEvent(ctx, session, config, "guild-member");
     });
+
+    ctx.command("验证器状态").action(async () => {
+        const allKeys = [];
+        for await (const key of ctx.cache.keys("verifier:requests")) {
+            allKeys.push(key);
+        }
+
+        const friendRequests = [];
+        const guildRequests = [];
+        const guildMemberRequests = [];
+
+        for (const key of allKeys) {
+            const data = (await ctx.cache.get("verifier:requests", key)) as CachedRequest;
+            if (!data) continue;
+
+            if (data.type === "friend") {
+                friendRequests.push(data);
+            } else if (data.type === "guild") {
+                guildRequests.push(data);
+            } else if (data.type === "guild-member") {
+                guildMemberRequests.push(data);
+            }
+        }
+
+        const formatTimestamp = (timestamp: number) => {
+            const date = new Date(timestamp);
+            return date.toLocaleString("zh-CN");
+        };
+
+        const formatDuration = (ms: number) => {
+            const days = Math.floor(ms / (24 * 60 * 60 * 1000));
+            const hours = Math.floor((ms % (24 * 60 * 60 * 1000)) / (60 * 60 * 1000));
+            const minutes = Math.floor((ms % (60 * 60 * 1000)) / (60 * 1000));
+            return `${days}天${hours}小时${minutes}分钟`;
+        };
+
+        const formatRequestList = (requests: CachedRequest[]) => {
+            if (requests.length === 0) return "无";
+            return requests
+                .map((req, index) => {
+                    const session = req.session;
+                    const age = Date.now() - req.timestamp;
+                    return `  ${index + 1}. ${session.userId || session.guildId || "未知"} | 状态: ${
+                        req.status
+                    } | 时间: ${formatTimestamp(req.timestamp)} | 已等待: ${formatDuration(age)}`;
+                })
+                .join("\n");
+        };
+
+        const output = [
+            "=== 验证器状态 ===",
+            "",
+            "【缓存统计】",
+            `总请求数: ${allKeys.length}`,
+            `好友请求: ${friendRequests.length} 个`,
+            `入群邀请: ${guildRequests.length} 个`,
+            `入群申请: ${guildMemberRequests.length} 个`,
+            "",
+            "【好友请求详情】",
+            formatRequestList(friendRequests),
+            "",
+            "【入群邀请详情】",
+            formatRequestList(guildRequests),
+            "",
+            "【入群申请详情】",
+            formatRequestList(guildMemberRequests),
+            "",
+            `更新时间: ${formatTimestamp(Date.now())}`
+        ];
+
+        return output.join("\n");
+    });
 }
 
 export async function handleEvent(
