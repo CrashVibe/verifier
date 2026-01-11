@@ -45,7 +45,7 @@ export const Config: Schema<Config> = Schema.intersect([
     }),
     Schema.object({
         cacheDuration: Schema.number()
-            .default(24 * 60 * 60 * 1000)
+            .default(30 * 24 * 60 * 60 * 1000) // 30 days
             .description("缓存时间（毫秒）"),
         cronExpression: Schema.string().default("0 */3 * * *").description("定时表达式"),
         batchSize: Schema.number().default(3).min(1).description("每次处理数量")
