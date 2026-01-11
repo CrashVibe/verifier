@@ -69,6 +69,18 @@ export async function apply(ctx: Context, config: Config) {
         handleEvent(ctx, session, config, "guild-member");
     });
 
+    ctx.command("验证器处理", { authority: 3 }).action(async () => {
+        let count = 0;
+        await ctx.cache.forEach("verifier:requests", async (value, key) => {
+            ctx.bots.forEach((bot) => {
+                if (value.data?.selfId !== bot.selfId) return;
+                handleEvent(ctx, bot.session(value.data), config, value.type);
+                count++;
+            });
+        });
+        return `已处理 ${count} 条缓存请求`;
+    });
+
     ctx.command("验证器状态").action(async () => {
         const friendRequests: SessionProcess[] = [];
         const guildRequests: SessionProcess[] = [];
