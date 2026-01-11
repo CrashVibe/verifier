@@ -1,7 +1,7 @@
 import { Context, Schema, Session } from "koishi";
 import type { CachedRequest, Handlers, RequestHandler, SessionProcess } from "./types";
 import { handleRequest } from "./handler";
-import { applycron } from "./scheduler";
+import { applycron, processRequests } from "./scheduler";
 
 export const inject = ["cache", "cron"];
 
@@ -70,15 +70,7 @@ export async function apply(ctx: Context, config: Config) {
     });
 
     ctx.command("验证器处理", { authority: 3 }).action(async () => {
-        let count = 0;
-        await ctx.cache.forEach("verifier:requests", async (value, key) => {
-            ctx.bots.forEach((bot) => {
-                if (value.data?.selfId !== bot.selfId) return;
-                handleEvent(ctx, bot.session(value.data), config, value.type);
-                count++;
-            });
-        });
-        return `已处理 ${count} 条缓存请求`;
+        return `已处理 ${await processRequests(ctx, config)} 条缓存请求`;
     });
 
     ctx.command("验证器状态").action(async () => {
