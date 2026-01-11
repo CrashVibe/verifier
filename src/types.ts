@@ -4,10 +4,17 @@ type RequestHandler = number | GeneralHandler;
 type GeneralHandler = string | boolean | ((session: Session) => Awaitable<string | boolean | void>);
 type ApprovalResponse = [approve: boolean, comment?: string];
 
-interface CachedRequest {
+interface BaseRequest {
     type: "friend" | "guild" | "guild-member";
     timestamp: number;
     status: "pending" | "processing" | "processed";
+}
+
+interface CachedRequest extends BaseRequest {
+    data: Record<string, unknown>;
+}
+
+interface SessionProcess extends BaseRequest {
     session: Session;
 }
 
@@ -21,4 +28,4 @@ type Handlers = Record<
     }
 >;
 
-export { RequestHandler, GeneralHandler, ApprovalResponse, CachedRequest, Handlers };
+export { RequestHandler, GeneralHandler, ApprovalResponse, CachedRequest, Handlers, SessionProcess };

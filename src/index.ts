@@ -1,5 +1,5 @@
 import { Context, Schema, Session } from "koishi";
-import type { CachedRequest, Handlers, RequestHandler } from "./types";
+import type { CachedRequest, Handlers, RequestHandler, SessionProcess } from "./types";
 import { handleRequest } from "./handler";
 import { applycron } from "./scheduler";
 
@@ -70,27 +70,31 @@ export async function apply(ctx: Context, config: Config) {
     });
 
     ctx.command("验证器状态").action(async () => {
-        const allKeys = [];
-        for await (const key of ctx.cache.keys("verifier:requests")) {
+        const friendRequests: SessionProcess[] = [];
+        const guildRequests: SessionProcess[] = [];
+        const guildMemberRequests: SessionProcess[] = [];
+        const allKeys: string[] = [];
+
+        await ctx.cache.forEach("verifier:requests", async (value, key) => {
             allKeys.push(key);
-        }
-
-        const friendRequests = [];
-        const guildRequests = [];
-        const guildMemberRequests = [];
-
-        for (const key of allKeys) {
-            const data = (await ctx.cache.get("verifier:requests", key)) as CachedRequest;
-            if (!data) continue;
-
-            if (data.type === "friend") {
-                friendRequests.push(data);
-            } else if (data.type === "guild") {
-                guildRequests.push(data);
-            } else if (data.type === "guild-member") {
-                guildMemberRequests.push(data);
-            }
-        }
+            ctx.bots.forEach((bot) => {
+                if (value.data?.selfId !== bot.selfId) return;
+                const target =
+                    value.type === "friend"
+                        ? friendRequests
+                        : value.type === "guild"
+                        ? guildRequests
+                        : value.type === "guild-member"
+                        ? guildMemberRequests
+                        : undefined;
+                if (target) {
+                    target.push({
+                        ...value,
+                        session: bot.session(value.data)
+                    });
+                }
+            });
+        });
 
         const formatTimestamp = (timestamp: number) => {
             const date = new Date(timestamp);
@@ -104,7 +108,7 @@ export async function apply(ctx: Context, config: Config) {
             return `${days}天${hours}小时${minutes}分钟`;
         };
 
-        const formatRequestList = (requests: CachedRequest[]) => {
+        const formatRequestList = (requests: SessionProcess[]) => {
             if (requests.length === 0) return "无";
             return requests
                 .map((req, index) => {
@@ -179,7 +183,7 @@ async function cacheRequest(
         type,
         timestamp: Date.now(),
         status: "pending" as const,
-        session: session
+        data: JSON.parse(JSON.stringify(session))
     };
     await ctx.cache.set("verifier:requests", key, cachedData, maxAge);
 }
