@@ -120,15 +120,21 @@ export async function apply(ctx: Context, config: Config) {
             return `${days}天${hours}小时${minutes}分钟`;
         };
 
-        const formatRequestList = (requests: SessionProcess[]) => {
+        const formatRequestList = (requests: SessionProcess[], type: "friend" | "guild" | "guild-member") => {
             if (requests.length === 0) return "无";
             return requests
                 .map((req, index) => {
                     const session = req.session;
                     const age = Date.now() - req.timestamp;
-                    return `  ${index + 1}. ${session.userId || session.guildId || "未知"} | 状态: ${
-                        req.status
-                    } | 时间: ${formatTimestamp(req.timestamp)} | 已等待: ${formatDuration(age)}`;
+                    let id = "未知";
+                    if (type === "friend" || type === "guild-member") {
+                        id = session.userId || "未知";
+                    } else if (type === "guild") {
+                        id = session.guildId || "未知";
+                    }
+                    return `  ${index + 1}. ${id} | 状态: ${req.status} | 时间: ${formatTimestamp(
+                        req.timestamp
+                    )} | 已等待: ${formatDuration(age)}`;
                 })
                 .join("\n");
         };
@@ -136,24 +142,19 @@ export async function apply(ctx: Context, config: Config) {
         const output = [
             "=== 验证器状态 ===",
             "",
-            "【缓存统计】",
-            `总请求数: ${allKeys.length}`,
-            `好友请求: ${friendRequests.length} 个`,
-            `入群邀请: ${guildRequests.length} 个`,
-            `入群申请: ${guildMemberRequests.length} 个`,
-            "",
-            "【好友请求详情】",
-            formatRequestList(friendRequests),
-            "",
-            "【入群邀请详情】",
-            formatRequestList(guildRequests),
-            "",
-            "【入群申请详情】",
-            formatRequestList(guildMemberRequests),
-            "",
-            `更新时间: ${formatTimestamp(Date.now())}`
+            `【缓存】总请求: ${allKeys.length}`,
+            ...(config.onFriendRequest ? [`好友请求: ${friendRequests.length}`] : []),
+            ...(config.onGuildRequest ? [`入群邀请: ${guildRequests.length}`] : []),
+            ...(config.onGuildMemberRequest ? [`入群申请: ${guildMemberRequests.length}`] : []),
+            ""
         ];
 
+        if (config.onFriendRequest) output.push("【好友请求】", formatRequestList(friendRequests, "friend"), "");
+        if (config.onGuildRequest) output.push("【入群邀请】", formatRequestList(guildRequests, "guild"), "");
+        if (config.onGuildMemberRequest)
+            output.push("【入群申请】", formatRequestList(guildMemberRequests, "guild-member"), "");
+
+        output.push(`更新时间: ${formatTimestamp(Date.now())}`);
         return output.join("\n");
     });
 }
