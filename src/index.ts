@@ -183,7 +183,11 @@ async function cacheRequest(
     type: "friend" | "guild" | "guild-member",
     maxAge?: number
 ) {
-    const key = `${type}:${session.messageId}`;
+    const key = `${type}:${session.channelId}`;
+    const existing = await ctx.cache.get("verifier:requests", key);
+    if (existing && existing.status === "pending") {
+        return;
+    }
     const cachedData: CachedRequest = {
         type,
         timestamp: Date.now(),

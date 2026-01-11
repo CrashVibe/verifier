@@ -78,7 +78,7 @@ export async function processRequests(ctx: Context, config: Config): Promise<num
         ctx.logger.info(`机器人 ${botId}: 待处理 ${botRequests.length} 个请求，本次处理 ${toProcess.length} 个`);
 
         for (const req of toProcess) {
-            const key = `${req.type}:${req.session.messageId}`;
+            const key = `${req.type}:${req.session.channelId}`;
             req.status = "processing";
             await ctx.cache.set("verifier:requests", key, {
                 ...req,
