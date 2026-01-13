@@ -10,9 +10,9 @@
     "incremental": true,
     "skipLibCheck": true,
     "esModuleInterop": true,
+    "strict": true,
     "moduleResolution": "bundler",
     "jsx": "react-jsx",
-    "strict": true,
     "jsxImportSource": "@satorijs/element",
     "types": ["node", "yml-register/types"]
   },
